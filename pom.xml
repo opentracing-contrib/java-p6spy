@@ -45,7 +45,7 @@
     <project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
 
     <opentracing.version>0.30.0</opentracing.version>
-    <p6spy.version>3.3.0</p6spy.version>
+    <p6spy.version>3.4.0</p6spy.version>
   </properties>
 
   <dependencies>
