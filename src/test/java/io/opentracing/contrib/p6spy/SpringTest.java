@@ -1,11 +1,10 @@
 package io.opentracing.contrib.p6spy;
 
-import io.opentracing.ActiveSpan;
+import io.opentracing.Scope;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
-import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
-import io.opentracing.util.ThreadLocalActiveSpanSource;
+import io.opentracing.util.ThreadLocalScopeManager;
 import java.sql.SQLException;
 import java.util.List;
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -17,12 +16,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import static io.opentracing.contrib.p6spy.SpanChecker.checkSameTrace;
 import static io.opentracing.contrib.p6spy.SpanChecker.checkTags;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 public class SpringTest {
 
-  private static final MockTracer mockTracer = new MockTracer(new ThreadLocalActiveSpanSource(),
+  private static final MockTracer mockTracer = new MockTracer(new ThreadLocalScopeManager(),
       MockTracer.Propagator.TEXT_MAP);
 
   @BeforeClass
@@ -49,7 +47,7 @@ public class SpringTest {
     checkTags(finishedSpans, "myservice", "jdbc:hsqldb:mem:spring");
     checkSameTrace(finishedSpans);
 
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   @Test
@@ -64,12 +62,12 @@ public class SpringTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
 
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   @Test
   public void testWithSpanOnlyWithParent() throws SQLException {
-    try (ActiveSpan activeSpan = mockTracer.buildSpan("parent").startActive()) {
+    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive()) {
       BasicDataSource dataSource = getDataSource(";traceWithActiveSpanOnly=true");
 
       JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
@@ -81,7 +79,7 @@ public class SpringTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(2, finishedSpans.size());
     checkSameTrace(finishedSpans);
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   private BasicDataSource getDataSource(String options) {
