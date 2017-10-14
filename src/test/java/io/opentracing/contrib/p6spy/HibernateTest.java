@@ -1,10 +1,10 @@
 package io.opentracing.contrib.p6spy;
 
-import io.opentracing.ActiveSpan;
+import io.opentracing.Scope;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
 import io.opentracing.util.GlobalTracer;
-import io.opentracing.util.ThreadLocalActiveSpanSource;
+import io.opentracing.util.ThreadLocalScopeManager;
 import java.util.List;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -31,7 +31,7 @@ import static org.junit.Assert.assertNull;
 
 public class HibernateTest {
 
-  private static final MockTracer mockTracer = new MockTracer(new ThreadLocalActiveSpanSource(),
+  private static final MockTracer mockTracer = new MockTracer(new ThreadLocalScopeManager(),
       MockTracer.Propagator.TEXT_MAP);
 
   @BeforeClass
@@ -61,7 +61,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(8, finishedSpans.size());
     checkTags(finishedSpans, "myservice", "jdbc:hsqldb:mem:jpa");
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   @Test
@@ -80,12 +80,12 @@ public class HibernateTest {
 
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   @Test
   public void jpaWithActiveSpanOnlyWithParent() {
-    try (ActiveSpan activeSpan = mockTracer.buildSpan("parent").startActive()) {
+    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive()) {
       EntityManagerFactory entityManagerFactory =
           Persistence.createEntityManagerFactory("jpa_active_span_only");
 
@@ -103,7 +103,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(9, finishedSpans.size());
     checkSameTrace(finishedSpans);
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   @Test
@@ -123,7 +123,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(8, finishedSpans.size());
     checkTags(finishedSpans, "myservice", "jdbc:hsqldb:mem:hibernate");
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   @Test
@@ -143,7 +143,7 @@ public class HibernateTest {
 
     checkTags(finishedSpans, "inurl", "jdbc:hsqldb:mem:hibernate;tracingPeerService=inurl");
 
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   @Test
@@ -161,12 +161,12 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
 
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
   }
 
   @Test
   public void withActiveSpanOnlyWithParent() throws InterruptedException {
-    try (ActiveSpan activeSpan = mockTracer.buildSpan("parent").startActive()) {
+    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive()) {
       SessionFactory sessionFactory = createSessionFactory(";traceWithActiveSpanOnly=true");
       Session session = sessionFactory.openSession();
 
@@ -182,7 +182,7 @@ public class HibernateTest {
     assertEquals(9, finishedSpans.size());
     checkSameTrace(finishedSpans);
 
-    assertNull(mockTracer.activeSpan());
+    assertNull(mockTracer.scopeManager().active());
 
   }
 
