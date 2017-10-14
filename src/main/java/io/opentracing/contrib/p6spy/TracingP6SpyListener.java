@@ -2,10 +2,10 @@ package io.opentracing.contrib.p6spy;
 
 import com.p6spy.engine.common.StatementInformation;
 import com.p6spy.engine.event.SimpleJdbcEventListener;
-import io.opentracing.ActiveSpan;
-import io.opentracing.BaseSpan;
-import io.opentracing.NoopActiveSpanSource;
+import io.opentracing.Scope;
+import io.opentracing.Span;
 import io.opentracing.Tracer;
+import io.opentracing.noop.NoopScopeManager;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import java.sql.SQLException;
@@ -19,7 +19,7 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
   private final static String TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER = "traceWithActiveSpanOnly=true";
 
   private final String defaultPeerService;
-  private final ThreadLocal<ActiveSpan> currentSpan = new ThreadLocal<>();
+  private final ThreadLocal<Scope> currentScope = new ThreadLocal<>();
 
   TracingP6SpyListener(String defaultPeerService) {
     this.defaultPeerService = defaultPeerService;
@@ -48,41 +48,41 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
   private void onBefore(String operationName, StatementInformation statementInformation) {
     final Tracer tracer = GlobalTracer.get();
     if (tracer == null) return;
-    final ActiveSpan span = buildSpan(tracer, operationName, statementInformation);
-    currentSpan.set(span);
+    final Scope scope = buildSpan(tracer, operationName, statementInformation);
+    currentScope.set(scope);
   }
 
   private void onAfter(SQLException e) {
-    ActiveSpan span = currentSpan.get();
-    if (span == null) return;
-    Tags.ERROR.set(span, e != null);
-    span.close();
+    Scope scope = currentScope.get();
+    if (scope == null) return;
+    Tags.ERROR.set(scope.span(), e != null);
+    scope.close();
   }
 
-  private ActiveSpan buildSpan(Tracer tracer, String operationName, StatementInformation statementInformation) {
+  private Scope buildSpan(Tracer tracer, String operationName, StatementInformation statementInformation) {
     try {
-      final ActiveSpan activeSpan = tracer.activeSpan();
+      final Scope activeScope = tracer.scopeManager().active();
       final String dbUrl =
           statementInformation.getConnectionInformation().getConnection().getMetaData().getURL();
-      if (withActiveSpanOnly(dbUrl) && activeSpan == null) {
-        return NoopActiveSpanSource.NoopActiveSpan.INSTANCE;
+      if (withActiveSpanOnly(dbUrl) && activeScope == null) {
+        return NoopScopeManager.NoopScope.INSTANCE;
       }
 
       final Tracer.SpanBuilder spanBuilder = tracer
           .buildSpan(operationName)
           .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT);
-      if (activeSpan != null) {
-        spanBuilder.asChildOf(activeSpan);
+      if (activeScope != null) {
+        spanBuilder.asChildOf(activeScope.span());
       }
-      final ActiveSpan span = spanBuilder.startActive();
-      decorate(span, statementInformation);
-      return span;
+      final Scope scope = spanBuilder.startActive();
+      decorate(scope.span(), statementInformation);
+      return scope;
     } catch (SQLException e) {
-      return NoopActiveSpanSource.NoopActiveSpan.INSTANCE;
+      return NoopScopeManager.NoopScope.INSTANCE;
     }
   }
 
-  private void decorate(BaseSpan<?> span, StatementInformation statementInformation)
+  private void decorate(Span span, StatementInformation statementInformation)
       throws SQLException {
     final String dbUrl =
         statementInformation.getConnectionInformation().getConnection().getMetaData().getURL();
