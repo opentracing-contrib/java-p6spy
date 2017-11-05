@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/opentracing-contrib/java-p6spy.svg?branch=master)](https://travis-ci.org/opentracing-contrib/java-p6spy)
+[![Build Status][ci-img]][ci] [![Released Version][maven-img]][maven]
 
 # opentracing-p6spy
 OpenTracing instrumentation for p6spy
@@ -10,13 +10,13 @@ pom.xml
 <dependency>
     <groupId>io.opentracing.contrib</groupId>
     <artifactId>opentracing-p6spy</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 </dependency>
 ```
 
 build.gradle
 ```groovy
-compile 'io.opentracing.contrib:opentracing-p6spy:0.0.1'
+compile 'io.opentracing.contrib:opentracing-p6spy:0.0.2'
 ```
 
 ## Usage
@@ -65,3 +65,8 @@ The following tags are added to traces :
 | `db.statement` | the SQL query |
 | `db.instance` | the connection's catalog (can be a database name or a schema) |
 | `db.user` | if exists, the user name |
+
+[ci-img]: https://travis-ci.org/opentracing-contrib/java-p6spy.svg?branch=master
+[ci]: https://travis-ci.org/opentracing-contrib/java-p6spy
+[maven-img]: https://img.shields.io/maven-central/v/io.opentracing.contrib/opentracing-p6spy.svg
+[maven]: http://search.maven.org/#search%7Cga%7C1%7Copentracing-p6spy
