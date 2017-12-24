@@ -85,7 +85,7 @@ public class HibernateTest {
 
   @Test
   public void jpaWithActiveSpanOnlyWithParent() {
-    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive()) {
+    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive(true)) {
       EntityManagerFactory entityManagerFactory =
           Persistence.createEntityManagerFactory("jpa_active_span_only");
 
@@ -166,7 +166,7 @@ public class HibernateTest {
 
   @Test
   public void withActiveSpanOnlyWithParent() throws InterruptedException {
-    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive()) {
+    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive(true)) {
       SessionFactory sessionFactory = createSessionFactory(";traceWithActiveSpanOnly=true");
       Session session = sessionFactory.openSession();
 
