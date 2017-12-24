@@ -74,7 +74,7 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
       if (activeScope != null) {
         spanBuilder.asChildOf(activeScope.span());
       }
-      final Scope scope = spanBuilder.startActive();
+      final Scope scope = spanBuilder.startActive(true);
       decorate(scope.span(), statementInformation);
       return scope;
     } catch (SQLException e) {

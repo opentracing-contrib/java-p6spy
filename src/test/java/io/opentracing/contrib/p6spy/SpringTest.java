@@ -67,7 +67,7 @@ public class SpringTest {
 
   @Test
   public void testWithSpanOnlyWithParent() throws SQLException {
-    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive()) {
+    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive(true)) {
       BasicDataSource dataSource = getDataSource(";traceWithActiveSpanOnly=true");
 
       JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
