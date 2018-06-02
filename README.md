@@ -26,20 +26,17 @@ Add the tracing module in your list
 ```properties
 modulelist=io.opentracing.contrib.p6spy.TracingP6SpyFactory
 tracingPeerService=token_database
+traceWithActiveSpanOnly=true
 ```
-`tracingPeerService` is used to set the `peer.service` value as defined [here](https://github.com/opentracing/specification/blob/master/semantic_conventions.md).
+* `tracingPeerService` is used to set the `peer.service` value as defined [here](https://github.com/opentracing/specification/blob/master/semantic_conventions.md).
+* `traceWithActiveSpanOnly` in case you only want to trace calls when there is an active span;
 
 `spy.properties` is set globally to all instrumented connections. This can be limitating especially in environment accessing many databases.
-To overcome this, you can optionally set the `tracingPeerService` in the jdbc url : 
+To overcome this, you can optionally set the `tracingPeerService` and `traceWithActiveSpanOnly` in the jdbc url : 
 ```
-jdbc:p6spy:mysql://localhost/tk_db?tracingPeerService=token_database
+jdbc:p6spy:mysql://localhost/tk_db?tracingPeerService=token_database;traceWithActiveSpanOnly=true
 ```
 This will override `spy.properties`.
-
-In case you only want to trace calls when there is an active span, use `traceWithActiveSpanOnly`:
-```
-jdbc:p6spy:mysql://localhost/tk_db?traceWithActiveSpanOnly=true
-``` 
 
 Beware that some JDBC drivers do not support adding unknown properties.
 
@@ -47,6 +44,7 @@ Tips when using it in JavaEE application servers. If you happen to deploy many a
 ```properties
 modulelist=io.opentracing.contrib.p6spy.TracingP6SpyFactory
 tracingPeerService=token_database
+traceWithActiveSpanOnly=true
 jmxPrefix=authentication_service
 ``` 
 

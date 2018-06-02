@@ -9,20 +9,30 @@ import io.opentracing.noop.NoopScopeManager;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
 import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 class TracingP6SpyListener extends SimpleJdbcEventListener {
+  private static final Logger log = Logger.getLogger(TracingP6SpyListener.class.getName());
   private final static Pattern URL_PEER_SERVICE_FINDER =
       Pattern.compile("tracingPeerService=(\\w*)");
 
+  private enum OptionalBoolean {
+    TRUE, FALSE, OPTION_NOT_FOUND
+  }
+
   private final static String TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER = "traceWithActiveSpanOnly=true";
+  private final static String TRACE_WITHOUT_ACTIVE_SPAN_ONLY_FINDER = "traceWithActiveSpanOnly=false";
 
   private final String defaultPeerService;
+  private final boolean defaultTraceWithActiveSpanOnly;
   private final ThreadLocal<Scope> currentScope = new ThreadLocal<>();
 
-  TracingP6SpyListener(String defaultPeerService) {
+  TracingP6SpyListener(String defaultPeerService, boolean defaultTraceWithActiveSpanOnly) {
     this.defaultPeerService = defaultPeerService;
+    this.defaultTraceWithActiveSpanOnly = defaultTraceWithActiveSpanOnly;
   }
 
   @Override public void onBeforeAnyExecute(StatementInformation statementInformation) {
@@ -64,7 +74,7 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
       final Scope activeScope = tracer.scopeManager().active();
       final String dbUrl =
           statementInformation.getConnectionInformation().getConnection().getMetaData().getURL();
-      if (withActiveSpanOnly(dbUrl) && activeScope == null) {
+      if (!allowTraceWithNoActiveSpan(dbUrl) && activeScope == null) {
         return NoopScopeManager.NoopScope.INSTANCE;
       }
 
@@ -122,7 +132,26 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
     return "";
   }
 
-  private static boolean withActiveSpanOnly(String url) {
-    return url != null && url.contains(TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER);
+  private boolean allowTraceWithNoActiveSpan(String url) {
+    final OptionalBoolean withActiveSpanOnly = withActiveSpanOnly(url);
+    return withActiveSpanOnly != OptionalBoolean.OPTION_NOT_FOUND && withActiveSpanOnly == OptionalBoolean.FALSE || withActiveSpanOnly == OptionalBoolean.OPTION_NOT_FOUND && !defaultTraceWithActiveSpanOnly;
+  }
+
+  private static OptionalBoolean withActiveSpanOnly(String url) {
+    if(url == null) {
+      return OptionalBoolean.OPTION_NOT_FOUND;
+    }
+    if(url.contains(TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER) && url.contains(TRACE_WITHOUT_ACTIVE_SPAN_ONLY_FINDER)) {
+      if(log.isLoggable(Level.WARNING)) {
+        log.warning("jdbc url contains contradictory traceWithActiveSpanOnly=true and traceWithActiveSpanOnly=false options. Defaulting to no options");
+      }
+      return OptionalBoolean.OPTION_NOT_FOUND;
+    }
+    if(url.contains(TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER)) {
+      return OptionalBoolean.TRUE;
+    } else if (url.contains(TRACE_WITHOUT_ACTIVE_SPAN_ONLY_FINDER)) {
+      return OptionalBoolean.FALSE;
+    }
+    return OptionalBoolean.OPTION_NOT_FOUND;
   }
 }

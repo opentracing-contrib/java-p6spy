@@ -1,5 +1,7 @@
 package io.opentracing.contrib.p6spy;
 
+import com.p6spy.engine.spy.P6ModuleManager;
+import com.p6spy.engine.spy.option.SpyDotProperties;
 import io.opentracing.Scope;
 import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
@@ -40,7 +42,7 @@ public class HibernateTest {
   }
 
   @Before
-  public void before() throws Exception {
+  public void before() {
     mockTracer.reset();
   }
 
@@ -107,7 +109,7 @@ public class HibernateTest {
   }
 
   @Test
-  public void hibernate() throws InterruptedException {
+  public void hibernate() {
     SessionFactory sessionFactory = createSessionFactory("");
     Session session = sessionFactory.openSession();
 
@@ -127,7 +129,7 @@ public class HibernateTest {
   }
 
   @Test
-  public void withPeerNameInUrl() throws InterruptedException {
+  public void withPeerNameInUrl() {
     SessionFactory sessionFactory = createSessionFactory(";tracingPeerService=inurl");
     Session session = sessionFactory.openSession();
 
@@ -147,7 +149,7 @@ public class HibernateTest {
   }
 
   @Test
-  public void withActiveSpanOnlyNoParent() throws InterruptedException {
+  public void withActiveSpanOnlyNoParent() {
     SessionFactory sessionFactory = createSessionFactory(";traceWithActiveSpanOnly=true");
     Session session = sessionFactory.openSession();
 
@@ -165,7 +167,7 @@ public class HibernateTest {
   }
 
   @Test
-  public void withActiveSpanOnlyWithParent() throws InterruptedException {
+  public void withActiveSpanOnlyWithParent() {
     try (Scope activeSpan = mockTracer.buildSpan("parent").startActive(true)) {
       SessionFactory sessionFactory = createSessionFactory(";traceWithActiveSpanOnly=true");
       Session session = sessionFactory.openSession();
@@ -184,6 +186,111 @@ public class HibernateTest {
 
     assertNull(mockTracer.scopeManager().active());
 
+  }
+
+  @Test
+  public void withoutActiveSpanOnlyAndWithDefaultActiveSpanOnlyWithNoParent() throws Exception {
+    try (AutoCloseable resetOptionsAfterTest = useActiveOnlyp6spyProperties()) {
+      SessionFactory sessionFactory = createSessionFactory(";traceWithActiveSpanOnly=false");
+      Session session = sessionFactory.openSession();
+
+      Employee employee = new Employee();
+      session.beginTransaction();
+      session.save(employee);
+      session.getTransaction().commit();
+      session.close();
+      sessionFactory.close();
+    }
+
+    List<MockSpan> finishedSpans = mockTracer.finishedSpans();
+    assertEquals(8, finishedSpans.size());
+
+    assertNull(mockTracer.scopeManager().active());
+  }
+
+  @Test
+  public void withDefaultActiveSpanOnlyWithNoParent() throws Exception {
+    try (AutoCloseable resetOptionsAfterTest = useActiveOnlyp6spyProperties()) {
+      SessionFactory sessionFactory = createSessionFactory("");
+      Session session = sessionFactory.openSession();
+
+      Employee employee = new Employee();
+      session.beginTransaction();
+      session.save(employee);
+      session.getTransaction().commit();
+      session.close();
+      sessionFactory.close();
+    }
+
+    List<MockSpan> finishedSpans = mockTracer.finishedSpans();
+    assertEquals(0, finishedSpans.size());
+
+    assertNull(mockTracer.scopeManager().active());
+  }
+
+  @Test
+  public void withActiveSpanOnlyWithDefaultActiveSpanOnlyFalseWithNoParent() throws Exception {
+    try (AutoCloseable resetOptionsAfterTest = useActiveOnlyFalsep6spyProperties()) {
+      SessionFactory sessionFactory = createSessionFactory(";traceWithActiveSpanOnly=true");
+      Session session = sessionFactory.openSession();
+
+      Employee employee = new Employee();
+      session.beginTransaction();
+      session.save(employee);
+      session.getTransaction().commit();
+      session.close();
+      sessionFactory.close();
+    }
+
+    List<MockSpan> finishedSpans = mockTracer.finishedSpans();
+    assertEquals(0, finishedSpans.size());
+
+    assertNull(mockTracer.scopeManager().active());
+  }
+
+  @Test
+  public void withoutAndWithActiveSpanOnlyAndWithDefaultActiveSpanOnlyWithNoParent() throws Exception {
+    try (AutoCloseable resetOptionsAfterTest = useActiveOnlyp6spyProperties()) {
+      SessionFactory sessionFactory = createSessionFactory(";traceWithActiveSpanOnly=false;traceWithActiveSpanOnly=true");
+      Session session = sessionFactory.openSession();
+
+      Employee employee = new Employee();
+      session.beginTransaction();
+      session.save(employee);
+      session.getTransaction().commit();
+      session.close();
+      sessionFactory.close();
+    }
+
+    List<MockSpan> finishedSpans = mockTracer.finishedSpans();
+    assertEquals(0, finishedSpans.size());
+
+    assertNull(mockTracer.scopeManager().active());
+  }
+
+  private static AutoCloseable useActiveOnlyp6spyProperties() throws Exception {
+    return usep6spyProperties("spy_active_only.properties");
+  }
+
+  private static AutoCloseable useActiveOnlyFalsep6spyProperties() throws Exception {
+    return usep6spyProperties("spy_active_only_false.properties");
+  }
+
+  private static AutoCloseable usep6spyProperties(String fileName) throws Exception {
+    final AutoCloseable resetp6spyOptions = new AutoCloseable() {
+      @Override public void close() {
+        System.clearProperty(SpyDotProperties.OPTIONS_FILE_PROPERTY);
+        P6ModuleManager.getInstance().reload();
+      }
+    };
+    try {
+      System.setProperty(SpyDotProperties.OPTIONS_FILE_PROPERTY, fileName);
+      P6ModuleManager.getInstance().reload();
+    } catch (Exception e) {
+      resetp6spyOptions.close();
+      throw e;
+    }
+    return resetp6spyOptions;
   }
 
   private SessionFactory createSessionFactory(String options) {
