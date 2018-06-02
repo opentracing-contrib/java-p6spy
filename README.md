@@ -10,13 +10,13 @@ pom.xml
 <dependency>
     <groupId>io.opentracing.contrib</groupId>
     <artifactId>opentracing-p6spy</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
 build.gradle
 ```groovy
-compile 'io.opentracing.contrib:opentracing-p6spy:0.1.0'
+compile 'io.opentracing.contrib:opentracing-p6spy:0.2.0'
 ```
 
 ## Usage
