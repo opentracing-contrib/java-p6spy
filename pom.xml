@@ -63,6 +63,8 @@
 
     <opentracing.version>0.31.0</opentracing.version>
     <p6spy.version>3.7.0</p6spy.version>
+    <coveralls-maven-plugin.version>4.3.0</coveralls-maven-plugin.version>
+    <jacoco-maven-plugin.version>0.8.1</jacoco-maven-plugin.version>
   </properties>
 
   <dependencies>
@@ -196,6 +198,24 @@
               <goal>check</goal>
             </goals>
             <phase>compile</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.eluder.coveralls</groupId>
+        <artifactId>coveralls-maven-plugin</artifactId>
+        <version>${coveralls-maven-plugin.version}</version>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco-maven-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
           </execution>
         </executions>
       </plugin>
