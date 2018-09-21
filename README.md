@@ -59,9 +59,9 @@ The following tags are added to traces :
 | `component` | `java-p6spy` |
 | `peer.service` | if exists, the peer service name set in `spy.properties` or within the jdbc url using `tracingPeerService` |
 | `error` | `true` is any error occurred. `false` otherwise |
-| `db.type` | the authoritative part of the jdbc url (ex : `mysql` in `jdbc:mysql://localhost`) |
+| `db.type` | if exists, the authoritative part of the jdbc url (ex : `mysql` in `jdbc:mysql://localhost`) |
 | `db.statement` | the SQL query |
-| `db.instance` | the connection's catalog (can be a database name or a schema) |
+| `db.instance` | if exists, the connection's catalog (can be a database name or a schema) |
 | `db.user` | if exists, the user name |
 
 [ci-img]: https://travis-ci.org/opentracing-contrib/java-p6spy.svg?branch=master
