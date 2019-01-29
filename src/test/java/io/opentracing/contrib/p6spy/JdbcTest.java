@@ -114,7 +114,7 @@ public class JdbcTest {
 
   private static void simulateExecuteQuery(Connection connection) {
     final StatementInformation statementInformation = new StatementInformation(ConnectionInformation.fromTestConnection(connection));
-    final TracingP6SpyListener p6SpyListener = new TracingP6SpyListener("", false);
+    final TracingP6SpyListener p6SpyListener = new TracingP6SpyListener("", false, false);
     p6SpyListener.onBeforeAnyExecute(statementInformation);
     p6SpyListener.onAfterAnyExecute(statementInformation, 1, null);
   }

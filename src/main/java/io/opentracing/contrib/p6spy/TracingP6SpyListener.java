@@ -38,14 +38,18 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
 
   private final static String TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER = "traceWithActiveSpanOnly=true";
   private final static String TRACE_WITHOUT_ACTIVE_SPAN_ONLY_FINDER = "traceWithActiveSpanOnly=false";
+  private final static String TRACE_WITH_STATEMENT_VALUES = "traceWithStatementValues=true";
+  private final static String TRACE_WITHOUT_STATEMENT_VALUES = "traceWithStatementValues=false";
 
   private final String defaultPeerService;
   private final boolean defaultTraceWithActiveSpanOnly;
+  private final boolean defaultTraceWithStatementValues;
   private final ThreadLocal<Scope> currentScope = new ThreadLocal<>();
 
-  TracingP6SpyListener(String defaultPeerService, boolean defaultTraceWithActiveSpanOnly) {
+  TracingP6SpyListener(String defaultPeerService, boolean defaultTraceWithActiveSpanOnly, boolean defaultTraceWithStatementValues) {
     this.defaultPeerService = defaultPeerService;
     this.defaultTraceWithActiveSpanOnly = defaultTraceWithActiveSpanOnly;
+    this.defaultTraceWithStatementValues = defaultTraceWithStatementValues;
   }
 
   @Override public void onBeforeAnyExecute(StatementInformation statementInformation) {
@@ -121,7 +125,11 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
         statementInformation.getConnectionInformation().getConnection().getCatalog();
 
     Tags.COMPONENT.set(span, "java-p6spy");
-    Tags.DB_STATEMENT.set(span, statementInformation.getSql());
+    if (!allowTraceWithStatementValues(dbUrl)) {
+      Tags.DB_STATEMENT.set(span, statementInformation.getSql());
+    } else {
+      Tags.DB_STATEMENT.set(span, statementInformation.getSqlWithValues());
+    }
     if (!isNullOrEmpty(dbUrl)) {
       span.setTag("peer.address", dbUrl);
       Tags.DB_TYPE.set(span, extractDbType(dbUrl));
@@ -156,19 +164,32 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
     return withActiveSpanOnly != OptionalBoolean.OPTION_NOT_FOUND && withActiveSpanOnly == OptionalBoolean.FALSE || withActiveSpanOnly == OptionalBoolean.OPTION_NOT_FOUND && !defaultTraceWithActiveSpanOnly;
   }
 
+  private boolean allowTraceWithStatementValues(String url) {
+    final OptionalBoolean withStatementValues = withStatementValues(url);
+    return withStatementValues != OptionalBoolean.OPTION_NOT_FOUND && withStatementValues == OptionalBoolean.TRUE || withStatementValues == OptionalBoolean.OPTION_NOT_FOUND && defaultTraceWithStatementValues;
+  }
+
   private static OptionalBoolean withActiveSpanOnly(String url) {
+    return withOrWithout(url, TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER, TRACE_WITHOUT_ACTIVE_SPAN_ONLY_FINDER);
+  }
+
+  private static OptionalBoolean withStatementValues(String url) {
+    return withOrWithout(url, TRACE_WITH_STATEMENT_VALUES, TRACE_WITHOUT_STATEMENT_VALUES);
+  }
+
+  private static OptionalBoolean withOrWithout(String url, String with, String without) {
     if(url == null) {
       return OptionalBoolean.OPTION_NOT_FOUND;
     }
-    if(url.contains(TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER) && url.contains(TRACE_WITHOUT_ACTIVE_SPAN_ONLY_FINDER)) {
+    if(url.contains(with) && url.contains(without)) {
       if(log.isLoggable(Level.WARNING)) {
-        log.warning("jdbc url contains contradictory traceWithActiveSpanOnly=true and traceWithActiveSpanOnly=false options. Defaulting to no options");
+        log.warning("jdbc url contains contradictory " + with + " and " + without + " options. Defaulting to no options");
       }
       return OptionalBoolean.OPTION_NOT_FOUND;
     }
-    if(url.contains(TRACE_WITH_ACTIVE_SPAN_ONLY_FINDER)) {
+    if(url.contains(with)) {
       return OptionalBoolean.TRUE;
-    } else if (url.contains(TRACE_WITHOUT_ACTIVE_SPAN_ONLY_FINDER)) {
+    } else if (url.contains(without)) {
       return OptionalBoolean.FALSE;
     }
     return OptionalBoolean.OPTION_NOT_FOUND;
