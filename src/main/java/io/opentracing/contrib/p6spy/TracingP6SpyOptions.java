@@ -20,6 +20,7 @@ import java.util.Map;
 class TracingP6SpyOptions extends P6SpyOptions {
   private static final String PEER_SERVICE = "tracingPeerService";
   private static final String TRACE_WITH_ACTIVE_SPAN_ONLY = "traceWithActiveSpanOnly";
+  private static final String TRACE_WITH_STATEMENT_VALUES = "traceWithStatementValues";
 
   private final P6OptionsRepository optionsRepository;
 
@@ -33,6 +34,7 @@ class TracingP6SpyOptions extends P6SpyOptions {
 
     optionsRepository.set(String.class, PEER_SERVICE, options.get(PEER_SERVICE));
     optionsRepository.set(Boolean.class, TRACE_WITH_ACTIVE_SPAN_ONLY, options.get(TRACE_WITH_ACTIVE_SPAN_ONLY));
+    optionsRepository.set(Boolean.class, TRACE_WITH_STATEMENT_VALUES, options.get(TRACE_WITH_STATEMENT_VALUES));
   }
 
   String tracingPeerService() {
@@ -41,6 +43,11 @@ class TracingP6SpyOptions extends P6SpyOptions {
 
   boolean traceWithActiveSpanOnly() {
     final Boolean traceWithActiveSpanOnly = optionsRepository.get(Boolean.class, TRACE_WITH_ACTIVE_SPAN_ONLY);
+    return traceWithActiveSpanOnly != null && traceWithActiveSpanOnly;
+  }
+
+  boolean traceWithStatementValues() {
+    final Boolean traceWithActiveSpanOnly = optionsRepository.get(Boolean.class, TRACE_WITH_STATEMENT_VALUES);
     return traceWithActiveSpanOnly != null && traceWithActiveSpanOnly;
   }
 }

@@ -10,13 +10,13 @@ pom.xml
 <dependency>
     <groupId>io.opentracing.contrib</groupId>
     <artifactId>opentracing-p6spy</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
 build.gradle
 ```groovy
-compile 'io.opentracing.contrib:opentracing-p6spy:0.2.0'
+compile 'io.opentracing.contrib:opentracing-p6spy:0.3.0'
 ```
 
 ## Usage
@@ -27,14 +27,16 @@ Add the tracing module in your list
 modulelist=io.opentracing.contrib.p6spy.TracingP6SpyFactory
 tracingPeerService=token_database
 traceWithActiveSpanOnly=true
+traceWithStatementValues=true
 ```
 * `tracingPeerService` is used to set the `peer.service` value as defined [here](https://github.com/opentracing/specification/blob/master/semantic_conventions.md).
 * `traceWithActiveSpanOnly` in case you only want to trace calls when there is an active span;
+* `traceWithStatementValues` in case you want to trace calls with values of prepared statement. :warning: this can cause data leaks / security issues;
 
 `spy.properties` is set globally to all instrumented connections. This can be limitating especially in environment accessing many databases.
-To overcome this, you can optionally set the `tracingPeerService` and `traceWithActiveSpanOnly` in the jdbc url : 
+To overcome this, you can optionally set the `tracingPeerService`, `traceWithActiveSpanOnly` and `traceWithStatementValues` in the jdbc url : 
 ```
-jdbc:p6spy:mysql://localhost/tk_db?tracingPeerService=token_database;traceWithActiveSpanOnly=true
+jdbc:p6spy:mysql://localhost/tk_db?tracingPeerService=token_database;traceWithActiveSpanOnly=true;traceWithStatementValues=true
 ```
 This will override `spy.properties`.
 
@@ -45,6 +47,7 @@ Tips when using it in JavaEE application servers. If you happen to deploy many a
 modulelist=io.opentracing.contrib.p6spy.TracingP6SpyFactory
 tracingPeerService=token_database
 traceWithActiveSpanOnly=true
+traceWithStatementValues=true
 jmxPrefix=authentication_service
 ``` 
 
@@ -60,7 +63,7 @@ The following tags are added to traces :
 | `peer.service` | if exists, the peer service name set in `spy.properties` or within the jdbc url using `tracingPeerService` |
 | `error` | `true` is any error occurred. `false` otherwise |
 | `db.type` | if exists, the authoritative part of the jdbc url (ex : `mysql` in `jdbc:mysql://localhost`) |
-| `db.statement` | the SQL query |
+| `db.statement` | the SQL query. If traceWithStatementValues is true, values from prepared statements will be logged. |
 | `db.instance` | if exists, the connection's catalog (can be a database name or a schema) |
 | `db.user` | if exists, the user name |
 

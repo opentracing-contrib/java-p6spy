@@ -18,17 +18,23 @@ import io.opentracing.mock.MockSpan;
 import io.opentracing.mock.MockTracer;
 import io.opentracing.util.GlobalTracerTestUtil;
 import io.opentracing.util.ThreadLocalScopeManager;
+
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCallback;
 
+import static io.opentracing.contrib.p6spy.HibernateTest.findSpanWithStatementContaining;
 import static io.opentracing.contrib.p6spy.SpanChecker.checkSameTrace;
 import static io.opentracing.contrib.p6spy.SpanChecker.checkTags;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 public class SpringTest {
@@ -93,6 +99,30 @@ public class SpringTest {
     assertEquals(2, finishedSpans.size());
     checkSameTrace(finishedSpans);
     assertNull(mockTracer.scopeManager().active());
+  }
+
+  @Test
+  public void testWithStatementValues() throws SQLException {
+    BasicDataSource dataSource = getDataSource(";traceWithStatementValues=true");
+
+    JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+    jdbcTemplate.execute("CREATE TABLE with_statement_values (id INTEGER)");
+    jdbcTemplate.execute("INSERT INTO with_statement_values values(?)", new PreparedStatementCallback<Object>() {
+      @Override
+      public Object doInPreparedStatement(PreparedStatement preparedStatement) throws SQLException, DataAccessException {
+        preparedStatement.setInt(1, 6);
+        return preparedStatement.execute();
+      }
+    });
+
+    dataSource.close();
+
+    List<MockSpan> finishedSpans = mockTracer.finishedSpans();
+    MockSpan spanWithStatementValues = findSpanWithStatementContaining(finishedSpans, "values(6)");
+    assertNotNull(spanWithStatementValues);
+
+    MockSpan spanWithoutStatementValues = findSpanWithStatementContaining(finishedSpans, "(?, ?)");
+    assertNull(spanWithoutStatementValues);
   }
 
   private BasicDataSource getDataSource(String options) {
