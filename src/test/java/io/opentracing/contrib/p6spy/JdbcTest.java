@@ -98,9 +98,19 @@ public class JdbcTest {
   }
 
   @Test
-  public void should_not_report_span_with_sql_exception() throws Exception {
+  public void should_report_span_with_sql_exception_on_decorate() throws Exception {
     final Connection connection = createConnection();
     Mockito.when(connection.getCatalog()).thenThrow(new SQLException());
+    simulateExecuteQuery(connection);
+
+    List<MockSpan> spans = mockTracer.finishedSpans();
+    assertEquals(1, spans.size());
+  }
+
+  @Test
+  public void should_not_report_span_with_sql_exception_on_url_analysis() throws Exception {
+    final Connection connection = createConnection();
+    Mockito.when(connection.getMetaData()).thenThrow(new SQLException());
     simulateExecuteQuery(connection);
 
     List<MockSpan> spans = mockTracer.finishedSpans();

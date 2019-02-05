@@ -87,61 +87,67 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
   }
 
   private Scope buildSpan(Tracer tracer, String operationName, StatementInformation statementInformation) {
+    final Scope activeScope = tracer.scopeManager().active();
+
     try {
-      final Scope activeScope = tracer.scopeManager().active();
       final String dbUrl =
           statementInformation.getConnectionInformation().getConnection().getMetaData().getURL();
       if (!allowTraceWithNoActiveSpan(dbUrl) && activeScope == null) {
         return NoopScopeManager.NoopScope.INSTANCE;
       }
-
-      final Tracer.SpanBuilder spanBuilder = tracer
-          .buildSpan(operationName)
-          .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT);
-      if (activeScope != null) {
-        spanBuilder.asChildOf(activeScope.span());
-      }
-      final Scope scope = spanBuilder.startActive(true);
-      decorate(scope.span(), statementInformation);
-      return scope;
     } catch (SQLException e) {
       return NoopScopeManager.NoopScope.INSTANCE;
     }
+
+    final Tracer.SpanBuilder spanBuilder = tracer
+            .buildSpan(operationName)
+            .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT);
+    if (activeScope != null) {
+      spanBuilder.asChildOf(activeScope.span());
+    }
+    final Scope scope = spanBuilder.startActive(true);
+    decorate(scope.span(), statementInformation);
+    return scope;
   }
 
-  private void decorate(Span span, StatementInformation statementInformation)
-      throws SQLException {
-    final String dbUrl =
-        statementInformation.getConnectionInformation().getConnection().getMetaData().getURL();
-    final String extractedPeerName = extractPeerService(dbUrl);
-    final String peerName =
-        extractedPeerName != null && !extractedPeerName.isEmpty() ? extractedPeerName
-            : defaultPeerService;
-    final String dbUser = statementInformation.getConnectionInformation()
-        .getConnection()
-        .getMetaData()
-        .getUserName();
-    final String dbInstance =
-        statementInformation.getConnectionInformation().getConnection().getCatalog();
+  private void decorate(Span span, StatementInformation statementInformation) {
+    try {
+      final String dbUrl =
+              statementInformation.getConnectionInformation().getConnection().getMetaData().getURL();
+      final String extractedPeerName = extractPeerService(dbUrl);
+      final String peerName =
+              extractedPeerName != null && !extractedPeerName.isEmpty() ? extractedPeerName
+                      : defaultPeerService;
+      final String dbUser = statementInformation.getConnectionInformation()
+              .getConnection()
+              .getMetaData()
+              .getUserName();
+      final String dbInstance =
+              statementInformation.getConnectionInformation().getConnection().getCatalog();
 
-    Tags.COMPONENT.set(span, "java-p6spy");
-    if (!allowTraceWithStatementValues(dbUrl)) {
-      Tags.DB_STATEMENT.set(span, statementInformation.getSql());
-    } else {
-      Tags.DB_STATEMENT.set(span, statementInformation.getSqlWithValues());
-    }
-    if (!isNullOrEmpty(dbUrl)) {
-      span.setTag("peer.address", dbUrl);
-      Tags.DB_TYPE.set(span, extractDbType(dbUrl));
-    }
-    if (!isNullOrEmpty(dbInstance)) {
-      Tags.DB_INSTANCE.set(span, dbInstance);
-    }
-    if (!isNullOrEmpty(peerName)) {
-      Tags.PEER_SERVICE.set(span, peerName);
-    }
-    if (!isNullOrEmpty(dbUser)) {
-      Tags.DB_USER.set(span, dbUser);
+      Tags.COMPONENT.set(span, "java-p6spy");
+      if (!allowTraceWithStatementValues(dbUrl)) {
+        Tags.DB_STATEMENT.set(span, statementInformation.getSql());
+      } else {
+        Tags.DB_STATEMENT.set(span, statementInformation.getSqlWithValues());
+      }
+      if (!isNullOrEmpty(dbUrl)) {
+        span.setTag("peer.address", dbUrl);
+        Tags.DB_TYPE.set(span, extractDbType(dbUrl));
+      }
+      if (!isNullOrEmpty(dbInstance)) {
+        Tags.DB_INSTANCE.set(span, dbInstance);
+      }
+      if (!isNullOrEmpty(peerName)) {
+        Tags.PEER_SERVICE.set(span, peerName);
+      }
+      if (!isNullOrEmpty(dbUser)) {
+        Tags.DB_USER.set(span, dbUser);
+      }
+    } catch (SQLException ex) {
+      if(log.isLoggable(Level.WARNING)) {
+        log.warning("Failed to decorate the span[" + span + "].");
+      }
     }
   }
 
