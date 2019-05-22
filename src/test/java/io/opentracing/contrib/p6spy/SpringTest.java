@@ -66,7 +66,7 @@ public class SpringTest {
     checkTags(finishedSpans, "myservice", "jdbc:hsqldb:mem:spring");
     checkSameTrace(finishedSpans);
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
@@ -81,24 +81,27 @@ public class SpringTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
   public void testWithSpanOnlyWithParent() throws SQLException {
-    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive(true)) {
+    MockSpan span = mockTracer.buildSpan("parent").start();
+    try (Scope activeSpan = mockTracer.activateSpan(span)) {
       BasicDataSource dataSource = getDataSource(";traceWithActiveSpanOnly=true");
 
       JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
       jdbcTemplate.execute("CREATE TABLE with_parent_skip (id INTEGER)");
 
       dataSource.close();
+    } finally {
+      span.finish();
     }
 
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(2, finishedSpans.size());
     checkSameTrace(finishedSpans);
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test

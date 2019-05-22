@@ -77,7 +77,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(8, finishedSpans.size());
     checkTags(finishedSpans, "myservice", "jdbc:hsqldb:mem:jpa");
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.scopeManager().activeSpan());
   }
 
   @Test
@@ -96,12 +96,13 @@ public class HibernateTest {
 
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
   public void jpaWithActiveSpanOnlyWithParent() {
-    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive(true)) {
+    MockSpan span = mockTracer.buildSpan("parent").start();
+    try (Scope activeSpan = mockTracer.activateSpan(span)) {
       EntityManagerFactory entityManagerFactory =
           Persistence.createEntityManagerFactory("jpa_active_span_only");
 
@@ -114,12 +115,14 @@ public class HibernateTest {
       entityManagerFactory.close();
 
       assertNotNull(employee.id);
+    } finally {
+      span.finish();
     }
 
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(9, finishedSpans.size());
     checkSameTrace(finishedSpans);
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
@@ -160,7 +163,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(8, finishedSpans.size());
     checkTags(finishedSpans, "myservice", "jdbc:hsqldb:mem:hibernate");
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
@@ -180,7 +183,7 @@ public class HibernateTest {
 
     checkTags(finishedSpans, "inurl", "jdbc:hsqldb:mem:hibernate;tracingPeerService=inurl");
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
@@ -198,12 +201,13 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
   public void withActiveSpanOnlyWithParent() {
-    try (Scope activeSpan = mockTracer.buildSpan("parent").startActive(true)) {
+    MockSpan span = mockTracer.buildSpan("parent").start();
+    try (Scope activeSpan = mockTracer.activateSpan(span)) {
       SessionFactory sessionFactory = createSessionFactory(";traceWithActiveSpanOnly=true");
       Session session = sessionFactory.openSession();
 
@@ -213,13 +217,15 @@ public class HibernateTest {
       session.getTransaction().commit();
       session.close();
       sessionFactory.close();
+    } finally {
+      span.finish();
     }
 
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(9, finishedSpans.size());
     checkSameTrace(finishedSpans);
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
 
   }
 
@@ -240,7 +246,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(8, finishedSpans.size());
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
@@ -260,7 +266,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
@@ -280,7 +286,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test
@@ -300,7 +306,7 @@ public class HibernateTest {
     List<MockSpan> finishedSpans = mockTracer.finishedSpans();
     assertEquals(0, finishedSpans.size());
 
-    assertNull(mockTracer.scopeManager().active());
+    assertNull(mockTracer.activeSpan());
   }
 
   @Test

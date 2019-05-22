@@ -19,8 +19,11 @@ import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopScopeManager;
+import io.opentracing.noop.NoopSpan;
 import io.opentracing.tag.Tags;
 import io.opentracing.util.GlobalTracer;
+
+import java.io.Closeable;
 import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -44,7 +47,7 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
   private final String defaultPeerService;
   private final boolean defaultTraceWithActiveSpanOnly;
   private final boolean defaultTraceWithStatementValues;
-  private final ThreadLocal<Scope> currentScope = new ThreadLocal<>();
+  private final ThreadLocal<ScopedSpan> currentScope = new ThreadLocal<>();
 
   TracingP6SpyListener(String defaultPeerService, boolean defaultTraceWithActiveSpanOnly, boolean defaultTraceWithStatementValues) {
     this.defaultPeerService = defaultPeerService;
@@ -75,39 +78,39 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
   private void onBefore(String operationName, StatementInformation statementInformation) {
     final Tracer tracer = GlobalTracer.get();
     if (tracer == null) return;
-    final Scope scope = buildSpan(tracer, operationName, statementInformation);
+    final ScopedSpan scope = buildSpan(tracer, operationName, statementInformation);
     currentScope.set(scope);
   }
 
   private void onAfter(SQLException e) {
-    Scope scope = currentScope.get();
-    if (scope == null) return;
-    Tags.ERROR.set(scope.span(), e != null);
-    scope.close();
+    ScopedSpan scopedSpan = currentScope.get();
+    if (scopedSpan == null) return;
+    Tags.ERROR.set(scopedSpan.span, e != null);
+    scopedSpan.close();
   }
 
-  private Scope buildSpan(Tracer tracer, String operationName, StatementInformation statementInformation) {
-    final Scope activeScope = tracer.scopeManager().active();
+  private ScopedSpan buildSpan(Tracer tracer, String operationName, StatementInformation statementInformation) {
+    final Span activeSpan = tracer.scopeManager().activeSpan();
 
     try {
       final String dbUrl =
           statementInformation.getConnectionInformation().getConnection().getMetaData().getURL();
-      if (!allowTraceWithNoActiveSpan(dbUrl) && activeScope == null) {
-        return NoopScopeManager.NoopScope.INSTANCE;
+      if (!allowTraceWithNoActiveSpan(dbUrl) && activeSpan == null) {
+        return ScopedSpan.NOOP;
       }
     } catch (SQLException e) {
-      return NoopScopeManager.NoopScope.INSTANCE;
+      return ScopedSpan.NOOP;
     }
 
     final Tracer.SpanBuilder spanBuilder = tracer
             .buildSpan(operationName)
             .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT);
-    if (activeScope != null) {
-      spanBuilder.asChildOf(activeScope.span());
+    if (activeSpan != null) {
+      spanBuilder.asChildOf(activeSpan);
     }
-    final Scope scope = spanBuilder.startActive(true);
-    decorate(scope.span(), statementInformation);
-    return scope;
+    final Span span = spanBuilder.start();
+    decorate(span, statementInformation);
+    return new ScopedSpan(tracer.scopeManager().activate(span), span);
   }
 
   private void decorate(Span span, StatementInformation statementInformation) {
@@ -203,5 +206,22 @@ class TracingP6SpyListener extends SimpleJdbcEventListener {
 
   private static boolean isNullOrEmpty(String s) {
     return s == null || s.isEmpty();
+  }
+
+  private final static class ScopedSpan implements Closeable {
+    static final ScopedSpan NOOP = new ScopedSpan(NoopScopeManager.NoopScope.INSTANCE, NoopSpan.INSTANCE);
+    final Scope scope;
+    final Span span;
+
+    private ScopedSpan(Scope scope, Span span) {
+      this.scope = scope;
+      this.span = span;
+    }
+
+    @Override
+    public void close() {
+      scope.close();
+      span.finish();
+    }
   }
 }
